@@ -295,6 +295,18 @@ class BackendManager {
     }
 }
 
+// MARK: - Single Instance
+
+func ensureSingleInstance() {
+    let currentPID = ProcessInfo.processInfo.processIdentifier
+    let bundleID = Bundle.main.bundleIdentifier ?? "com.codeflicker.signallight"
+    let hasOtherInstance = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+        .contains { $0.processIdentifier != currentPID }
+    if hasOtherInstance {
+        exit(0)
+    }
+}
+
 // MARK: - App Delegate
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -418,6 +430,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 // MARK: - Main
 
+ensureSingleInstance()
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
