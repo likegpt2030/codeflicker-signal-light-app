@@ -86,6 +86,10 @@ class CFProcessMonitor {
         timer?.tolerance = 0.3
     }
 
+    func isRunning() -> Bool {
+        return wasRunning
+    }
+
     private func checkPIDFile() -> Bool {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: pidFilePath),
               let mtime = attrs[.modificationDate] as? Date else {
@@ -361,21 +365,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.cfRunning = true
             self.lightView.state = .idle
             self.updateStatus("空闲")
+            self.statusItem.length = 42
         }
 
         monitor.onCFExit = { [weak self] in
             guard let self else { return }
             self.cfRunning = false
-            self.quit()
+            self.lightView.state = .waiting
+            self.updateStatus("等待 cf 启动…")
+            self.statusItem.length = 0
         }
 
         monitor.start()
+
+        // Hide status item initially if cf is not running
+        if !monitor.isRunning() {
+            statusItem.length = 0
+        }
 
         // Check initial state
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             if self?.cfRunning == true {
                 self?.lightView.state = .idle
                 self?.updateStatus("空闲")
+                self?.statusItem.length = 42
             }
         }
     }
