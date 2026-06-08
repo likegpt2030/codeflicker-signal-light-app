@@ -373,24 +373,16 @@ class FloatingPanel: NSPanel {
         }
 
         alphaValue = 0
+        orderFrontRegardless()
         connectSSE()
     }
 
     func showAnimated() {
-        setIsVisible(true)
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.3
-            self.animator().alphaValue = 1.0
-        }
+        alphaValue = 1.0
     }
 
     func hideAnimated() {
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.3
-            self.animator().alphaValue = 0.0
-        } completionHandler: {
-            self.setIsVisible(false)
-        }
+        alphaValue = 0.0
     }
 
     private func connectSSE() {
@@ -472,11 +464,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.stop()
         backend.stop()
         NSApp.terminate(nil)
-    }
-
-    // Never let SignalLight become the frontmost app
-    func applicationDidBecomeActive(_ notification: Notification) {
-        NSApp.hide(nil)
     }
 }
 
