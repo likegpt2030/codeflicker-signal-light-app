@@ -398,6 +398,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         backend.stop()
         NSApp.terminate(nil)
     }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Return focus to whichever app was frontmost before us
+        if let front = NSWorkspace.shared.frontmostApplication, front.bundleIdentifier != Bundle.main.bundleIdentifier {
+            return // another app is already frontmost, nothing to do
+        }
+        // We became frontmost — activate the previous app instead
+        let apps = NSWorkspace.shared.runningApplications.filter {
+            $0.activationPolicy == .regular && $0.bundleIdentifier != Bundle.main.bundleIdentifier
+        }
+        if let prev = apps.last(where: { $0.isActive }) ?? apps.last {
+            prev.activate()
+        } else {
+            NSApp.deactivate()
+        }
+    }
 }
 
 // MARK: - Main
