@@ -71,7 +71,11 @@ class CFProcessMonitor {
     private var wasRunning = false
     var onCFStart: (() -> Void)?
     var onCFExit: (() -> Void)?
-    private let cfBinaryPath = "/Users/like/.codeflicker/cli/bin/cf"
+    private let pidFilePath: String
+
+    init() {
+        pidFilePath = (NSHomeDirectory() as NSString).appendingPathComponent(".codeflicker/signal-light-sim/.cf-active")
+    }
 
     func start() {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -86,32 +90,22 @@ class CFProcessMonitor {
     }
 
     private func checkCFProcess() {
-        let isRunning = isCFRunning()
+        // PID file must be recent (< 20s old) to be valid
+        // This handles stale files if log-watcher exits unexpectedly
+        let isRunning: Bool = {
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: pidFilePath),
+                  let mtime = attrs[.modificationDate] as? Date else {
+                return false
+            }
+            return Date().timeIntervalSince(mtime) < 20
+        }()
+
         if isRunning && !wasRunning {
             onCFStart?()
         } else if !isRunning && wasRunning {
             onCFExit?()
         }
         wasRunning = isRunning
-    }
-
-    private func isCFRunning() -> Bool {
-        // Use pgrep to check if cf process is running
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        process.arguments = ["-x", "cf"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
-        }
     }
 }
 
@@ -383,8 +377,7 @@ class FloatingPanel: NSPanel {
     }
 
     func showAnimated() {
-        orderFront(nil)
-        NSApp.hide(nil)
+        setIsVisible(true)
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.3
             self.animator().alphaValue = 1.0
@@ -396,8 +389,7 @@ class FloatingPanel: NSPanel {
             ctx.duration = 0.3
             self.animator().alphaValue = 0.0
         } completionHandler: {
-            self.orderOut(nil)
-            NSApp.hide(nil)
+            self.setIsVisible(false)
         }
     }
 
@@ -433,9 +425,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         backend.start()
 
         panel = FloatingPanel()
-
-        // Immediately resign active to avoid stealing focus from user's current app
-        NSApp.hide(nil)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
@@ -483,6 +472,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.stop()
         backend.stop()
         NSApp.terminate(nil)
+    }
+
+    // Never let SignalLight become the frontmost app
+    func applicationDidBecomeActive(_ notification: Notification) {
+        NSApp.hide(nil)
     }
 }
 

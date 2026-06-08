@@ -1,0 +1,81 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "PackageStructure": ["<PackageStructure>"]
+  "SignalLight-arm64-apple-macosx-debug.exe": ["<SignalLight-arm64-apple-macosx-debug.exe>"]
+  "SignalLight-arm64-apple-macosx-debug.module": ["<SignalLight-arm64-apple-macosx-debug.module>"]
+  "main": ["<SignalLight-arm64-apple-macosx-debug.exe>","<SignalLight-arm64-apple-macosx-debug.module>"]
+  "test": ["<SignalLight-arm64-apple-macosx-debug.exe>","<SignalLight-arm64-apple-macosx-debug.module>"]
+default: "main"
+nodes:
+  "/Users/like/.codeflicker/signal-light-app/Sources/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight":
+    is-mutated: true
+commands:
+  "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight-entitlement.plist"]
+    description: "Write auxiliary file /Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight-entitlement.plist"
+
+  "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/like/.codeflicker/signal-light-app/Sources/main.swift"]
+    outputs: ["/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/sources"]
+    description: "Write auxiliary file /Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/sources"
+
+  "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.swift.o"]
+    outputs: ["/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.product/Objects.LinkFileList"
+
+  "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<SignalLight-arm64-apple-macosx-debug.exe>":
+    tool: phony
+    inputs: ["<SignalLight-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    outputs: ["<SignalLight-arm64-apple-macosx-debug.exe>"]
+
+  "<SignalLight-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.swift.o","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/Modules/SignalLight.swiftmodule"]
+    outputs: ["<SignalLight-arm64-apple-macosx-debug.module>"]
+
+  "C.SignalLight-arm64-apple-macosx-debug.exe":
+    tool: shell
+    inputs: ["/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.swift.o","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.product/Objects.LinkFileList"]
+    outputs: ["/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/SignalLight"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug","-o","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight","-module-name","SignalLight","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_SignalLight_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/Modules/SignalLight.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.SignalLight-arm64-apple-macosx-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight-entitlement.plist"]
+    outputs: ["<SignalLight-arm64-apple-macosx-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/SignalLight"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight-entitlement.plist","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight"]
+
+  "C.SignalLight-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/like/.codeflicker/signal-light-app/Sources/main.swift","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/sources"]
+    outputs: ["/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.swift.o","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/Modules/SignalLight.swiftmodule"]
+    description: "Compiling Swift Module 'SignalLight' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","SignalLight","-emit-dependencies","-emit-module","-emit-module-path","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/Modules/SignalLight.swiftmodule","-output-file-map","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/output-file-map.json","-incremental","-c","@/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/sources","-I","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j8","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","SignalLight_main","-swift-version","6","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","signal_light_app"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/like/.codeflicker/signal-light-app/Sources/","/Users/like/.codeflicker/signal-light-app/Package.swift","/Users/like/.codeflicker/signal-light-app/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

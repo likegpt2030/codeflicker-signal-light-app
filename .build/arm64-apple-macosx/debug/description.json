@@ -1,0 +1,239 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.SignalLight-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/sources",
+      "importPath" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/like/.codeflicker/signal-light-app/Sources/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "SignalLight",
+      "moduleOutputPath" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/Modules/SignalLight.swiftmodule",
+      "objects" : [
+        "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "SignalLight_main",
+        "-swift-version",
+        "6",
+        "-I",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-L",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-plugin-path",
+        "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "signal_light_app"
+      ],
+      "outputFileMapPath" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/Modules/SignalLight.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/like/.codeflicker/signal-light-app/Sources/main.swift"
+      ],
+      "tempsPath" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "SignalLight" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "SignalLight",
+      "-package-name",
+      "signal_light_app",
+      "-c",
+      "/Users/like/.codeflicker/signal-light-app/Sources/main.swift",
+      "-I",
+      "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "SignalLight_main",
+      "-swift-version",
+      "6",
+      "-I",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-L",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-plugin-path",
+      "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "signal_light_app",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "SignalLight" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight-entitlement.plist"
+    },
+    "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/like/.codeflicker/signal-light-app/Sources/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/sources"
+    },
+    "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.product/Objects.LinkFileList"
+    },
+    "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+    }
+  }
+}

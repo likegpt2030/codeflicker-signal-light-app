@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/primary.swiftdeps"
+  },
+  "/Users/like/.codeflicker/signal-light-app/Sources/main.swift": {
+    "dependencies": "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.d",
+    "object": "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.swift.o",
+    "swiftmodule": "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.swiftdeps",
+    "diagnostics": "/Users/like/.codeflicker/signal-light-app/.build/arm64-apple-macosx/debug/SignalLight.build/main.dia"
+  }
+}
