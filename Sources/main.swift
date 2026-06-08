@@ -78,10 +78,20 @@ class CFProcessMonitor {
     }
 
     func start() {
+        // Check if cf is already running at startup
+        wasRunning = checkPIDFile()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.checkCFProcess()
         }
         timer?.tolerance = 0.3
+    }
+
+    private func checkPIDFile() -> Bool {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: pidFilePath),
+              let mtime = attrs[.modificationDate] as? Date else {
+            return false
+        }
+        return Date().timeIntervalSince(mtime) < 20
     }
 
     func stop() {
@@ -90,13 +100,7 @@ class CFProcessMonitor {
     }
 
     private func checkCFProcess() {
-        let isRunning: Bool = {
-            guard let attrs = try? FileManager.default.attributesOfItem(atPath: pidFilePath),
-                  let mtime = attrs[.modificationDate] as? Date else {
-                return false
-            }
-            return Date().timeIntervalSince(mtime) < 20
-        }()
+        let isRunning = checkPIDFile()
 
         if isRunning && !wasRunning {
             onCFStart?()
