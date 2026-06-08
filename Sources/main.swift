@@ -325,26 +325,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var cfRunning = false
     var currentSummary = "等待 cf 启动…"
     let sseClient = SSEClient()
+    let idleIcon: NSImage = {
+        let img = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Signal Light")!
+        img.size = NSSize(width: 14, height: 14)
+        return img
+    }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         backend.start()
 
-        // Create status bar item with custom view
-        let lightW: CGFloat = 42
-        let lightH: CGFloat = 22
-        statusItem = NSStatusBar.system.statusItem(withLength: lightW)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            button.image = nil
-            button.title = ""
-            lightView = StatusBarLightView(frame: NSRect(x: 0, y: 0, width: lightW, height: lightH))
-            button.addSubview(lightView)
-            lightView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                lightView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
-                lightView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-                lightView.widthAnchor.constraint(equalToConstant: lightW),
-                lightView.heightAnchor.constraint(equalToConstant: lightH),
-            ])
+            button.image = idleIcon
             button.toolTip = currentSummary
         }
 
@@ -363,34 +355,59 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.onCFStart = { [weak self] in
             guard let self else { return }
             self.cfRunning = true
-            self.lightView.state = .idle
-            self.updateStatus("空闲")
-            self.statusItem.length = 42
+            self.showTrafficLight()
         }
 
         monitor.onCFExit = { [weak self] in
             guard let self else { return }
             self.cfRunning = false
-            self.lightView.state = .waiting
-            self.updateStatus("等待 cf 启动…")
-            self.statusItem.length = 0
+            self.showIdleIcon()
         }
 
         monitor.start()
 
-        // Hide status item initially if cf is not running
-        if !monitor.isRunning() {
-            statusItem.length = 0
+        // Show traffic light if cf is already running at startup
+        if monitor.isRunning() {
+            showTrafficLight()
         }
 
-        // Check initial state
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             if self?.cfRunning == true {
-                self?.lightView.state = .idle
-                self?.updateStatus("空闲")
-                self?.statusItem.length = 42
+                self?.showTrafficLight()
             }
         }
+    }
+
+    private func showTrafficLight() {
+        let lightW: CGFloat = 42
+        let lightH: CGFloat = 22
+        statusItem.length = lightW
+        if let button = statusItem.button {
+            button.image = nil
+            if lightView == nil {
+                lightView = StatusBarLightView(frame: NSRect(x: 0, y: 0, width: lightW, height: lightH))
+                button.addSubview(lightView)
+                lightView.translatesAutoresizingMaskIntoConstraints = false
+                NSLayoutConstraint.activate([
+                    lightView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+                    lightView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+                    lightView.widthAnchor.constraint(equalToConstant: lightW),
+                    lightView.heightAnchor.constraint(equalToConstant: lightH),
+                ])
+            }
+            lightView.state = .idle
+            lightView.isHidden = false
+        }
+        updateStatus("空闲")
+    }
+
+    private func showIdleIcon() {
+        statusItem.length = NSStatusItem.squareLength
+        if let button = statusItem.button {
+            lightView?.isHidden = true
+            button.image = idleIcon
+        }
+        updateStatus("等待 cf 启动…")
     }
 
     private func updateStatus(_ text: String) {

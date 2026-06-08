@@ -14,9 +14,6 @@ swift build
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$PROJECT_DIR/.build/debug/${APP_NAME}" "$MACOS_DIR/${APP_NAME}"
 cp "$PROJECT_DIR/Info.plist" "$CONTENTS_DIR/Info.plist"
-
-if [ -f "$HOME/Applications/${APP_NAME}.app/Contents/Resources/AppIcon.icns" ]; then
-  :
-fi
+cp "$PROJECT_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 
 codesign --force --sign - "$APP_DIR"
