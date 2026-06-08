@@ -362,8 +362,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.onCFExit = { [weak self] in
             guard let self else { return }
             self.cfRunning = false
-            self.lightView.state = .waiting
-            self.updateStatus("等待 cf 启动…")
+            self.quit()
         }
 
         monitor.start()
