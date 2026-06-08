@@ -90,8 +90,6 @@ class CFProcessMonitor {
     }
 
     private func checkCFProcess() {
-        // PID file must be recent (< 20s old) to be valid
-        // This handles stale files if log-watcher exits unexpectedly
         let isRunning: Bool = {
             guard let attrs = try? FileManager.default.attributesOfItem(atPath: pidFilePath),
                   let mtime = attrs[.modificationDate] as? Date else {
@@ -109,9 +107,9 @@ class CFProcessMonitor {
     }
 }
 
-// MARK: - Traffic Light View
+// MARK: - Status Bar Traffic Light View
 
-class TrafficLightView: NSView {
+class StatusBarLightView: NSView {
     enum LightState {
         case idle           // green solid
         case thinking       // yellow breathing
@@ -133,9 +131,8 @@ class TrafficLightView: NSView {
     private var timerSource: DispatchSourceTimer?
     private var startTime: CFTimeInterval = CACurrentMediaTime()
 
-    let lightRadius: CGFloat = 18
-    let lightSpacing: CGFloat = 10
-    let housingPadding: CGFloat = 14
+    let lightRadius: CGFloat = 5
+    let lightSpacing: CGFloat = 4
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -150,54 +147,37 @@ class TrafficLightView: NSView {
 
         let (r, y, g) = computeLightValues(t: t)
 
-        let w = bounds.width
         let h = bounds.height
-        let housingW = housingPadding * 2 + lightRadius * 2
-        let housingH = housingPadding * 2 + lightRadius * 2 * 3 + lightSpacing * 2
-        let hx = (w - housingW) / 2
-        let hy = (h - housingH) / 2
+        let centerY = h / 2
+        let totalW = lightRadius * 2 * 3 + lightSpacing * 2
+        let startX = (bounds.width - totalW) / 2 + lightRadius
 
-        // Housing background
-        let housingPath = NSBezierPath(roundedRect: NSRect(x: hx, y: hy, width: housingW, height: housingH), xRadius: 16, yRadius: 16)
-        NSColor(white: 0.1, alpha: 1.0).setFill()
-        housingPath.fill()
-
-        // Housing border
-        NSColor(white: 0.22, alpha: 0.6).setStroke()
-        housingPath.lineWidth = 1.0
-        housingPath.stroke()
-
-        // Light positions (bottom to top: green, yellow, red)
-        let centerX = w / 2
-        let greenY = hy + housingPadding + lightRadius
-        let yellowY = greenY + lightRadius * 2 + lightSpacing
-        let redY = yellowY + lightRadius * 2 + lightSpacing
-
-        drawLight(ctx: ctx, center: CGPoint(x: centerX, y: redY), radius: lightRadius,
+        // Horizontal: red, yellow, green
+        drawLight(ctx: ctx, center: CGPoint(x: startX, y: centerY), radius: lightRadius,
                   onColor: NSColor(calibratedRed: 1.0, green: 0.23, blue: 0.19, alpha: 1.0), intensity: r)
-        drawLight(ctx: ctx, center: CGPoint(x: centerX, y: yellowY), radius: lightRadius,
+        drawLight(ctx: ctx, center: CGPoint(x: startX + lightRadius * 2 + lightSpacing, y: centerY), radius: lightRadius,
                   onColor: NSColor(calibratedRed: 1.0, green: 0.84, blue: 0.03, alpha: 1.0), intensity: y)
-        drawLight(ctx: ctx, center: CGPoint(x: centerX, y: greenY), radius: lightRadius,
+        drawLight(ctx: ctx, center: CGPoint(x: startX + (lightRadius * 2 + lightSpacing) * 2, y: centerY), radius: lightRadius,
                   onColor: NSColor(calibratedRed: 0.20, green: 0.90, blue: 0.30, alpha: 1.0), intensity: g)
     }
 
     private func drawLight(ctx: CGContext, center: CGPoint, radius: CGFloat, onColor: NSColor, intensity: CGFloat) {
         let r = radius
 
-        // Outer glow when bright
+        // Glow
         if intensity > 0.3 {
-            let glowR = r + 6 * intensity
-            let glowColor = onColor.withAlphaComponent(intensity * 0.25)
+            let glowR = r + 3 * intensity
+            let glowColor = onColor.withAlphaComponent(intensity * 0.3)
             ctx.setFillColor(glowColor.cgColor)
             ctx.fillEllipse(in: NSRect(x: center.x - glowR, y: center.y - glowR, width: glowR * 2, height: glowR * 2))
         }
 
-        // Bezel ring
+        // Bezel
         let bezelColor = NSColor(white: 0.06, alpha: 1.0)
         ctx.setFillColor(bezelColor.cgColor)
-        ctx.fillEllipse(in: NSRect(x: center.x - r - 2, y: center.y - r - 2, width: (r + 2) * 2, height: (r + 2) * 2))
+        ctx.fillEllipse(in: NSRect(x: center.x - r - 1, y: center.y - r - 1, width: (r + 1) * 2, height: (r + 1) * 2))
 
-        // Light bulb
+        // Bulb
         let onR = onColor.redComponent, onG = onColor.greenComponent, onB = onColor.blueComponent
         let off: CGFloat = 0.06
         let curR = off + (onR - off) * intensity
@@ -265,7 +245,7 @@ class TrafficLightView: NSView {
 
 // MARK: - Signal Mapping
 
-func signalToState(_ signal: String) -> TrafficLightView.LightState {
+func signalToState(_ signal: String) -> StatusBarLightView.LightState {
     switch signal {
     case "idle":          return .idle
     case "thinking":      return .thinking
@@ -315,149 +295,102 @@ class BackendManager {
     }
 }
 
-// MARK: - Floating Panel
+// MARK: - App Delegate
 
-class FloatingPanel: NSPanel {
-    var trafficLight: TrafficLightView!
-    private var sseClient = SSEClient()
-    var statusField: NSTextField!
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var statusItem: NSStatusItem!
+    var lightView: StatusBarLightView!
+    let backend = BackendManager()
+    let monitor = CFProcessMonitor()
+    var cfRunning = false
+    var currentSummary = "等待 cf 启动…"
+    let sseClient = SSEClient()
 
-    init() {
-        let lightR: CGFloat = 18
-        let hp: CGFloat = 14
-        let ls: CGFloat = 10
-        let housingW = hp * 2 + lightR * 2 + 4
-        let housingH = hp * 2 + lightR * 2 * 3 + ls * 2 + 4
-        let viewW = housingW + 24
-        let viewH = housingH + 56
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        backend.start()
 
-        super.init(
-            contentRect: NSRect(x: 0, y: 0, width: viewW, height: viewH),
-            styleMask: [.nonactivatingPanel, .titled, .closable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-
-        isFloatingPanel = true
-        level = .floating
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        isMovableByWindowBackground = true
-        titleVisibility = .hidden
-        titlebarAppearsTransparent = true
-        isReleasedWhenClosed = false
-        backgroundColor = NSColor(white: 0.05, alpha: 0.85)
-        isOpaque = false
-        hasShadow = true
-        hidesOnDeactivate = false
-
-        // Traffic light view
-        let lightFrameH = housingH + 4
-        trafficLight = TrafficLightView(frame: NSRect(x: 0, y: 30, width: viewW, height: lightFrameH))
-        trafficLight.state = .waiting
-        contentView?.addSubview(trafficLight)
-
-        // Status text
-        statusField = NSTextField(labelWithString: "等待 cf 启动…")
-        statusField.alignment = .center
-        statusField.textColor = NSColor(white: 0.55, alpha: 1.0)
-        statusField.font = NSFont.systemFont(ofSize: 11, weight: .regular)
-        statusField.frame = NSRect(x: 0, y: 8, width: viewW, height: 18)
-        contentView?.addSubview(statusField)
-
-        // Position at top-right of screen
-        if let screen = NSScreen.main {
-            let screenFrame = screen.visibleFrame
-            let x = screenFrame.maxX - viewW - 20
-            let y = screenFrame.maxY - viewH - 20
-            setFrameOrigin(NSPoint(x: x, y: y))
+        // Create status bar item with custom view
+        let lightW: CGFloat = 42
+        let lightH: CGFloat = 22
+        statusItem = NSStatusBar.system.statusItem(withLength: lightW)
+        if let button = statusItem.button {
+            button.image = nil
+            button.title = ""
+            lightView = StatusBarLightView(frame: NSRect(x: 0, y: 0, width: lightW, height: lightH))
+            button.addSubview(lightView)
+            lightView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                lightView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+                lightView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+                lightView.widthAnchor.constraint(equalToConstant: lightW),
+                lightView.heightAnchor.constraint(equalToConstant: lightH),
+            ])
+            button.toolTip = currentSummary
         }
 
-        alphaValue = 0
-        orderFrontRegardless()
+        let menu = NSMenu()
+        let statusMenuItem = NSMenuItem(title: currentSummary, action: nil, keyEquivalent: "")
+        statusMenuItem.isEnabled = false
+        menu.addItem(statusMenuItem)
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
+        statusItem.menu = menu
+
+        // SSE
         connectSSE()
+
+        // CF process monitoring
+        monitor.onCFStart = { [weak self] in
+            guard let self else { return }
+            self.cfRunning = true
+            self.lightView.state = .idle
+            self.updateStatus("空闲")
+        }
+
+        monitor.onCFExit = { [weak self] in
+            guard let self else { return }
+            self.cfRunning = false
+            self.lightView.state = .waiting
+            self.updateStatus("等待 cf 启动…")
+        }
+
+        monitor.start()
+
+        // Check initial state
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            if self?.cfRunning == true {
+                self?.lightView.state = .idle
+                self?.updateStatus("空闲")
+            }
+        }
     }
 
-    func showAnimated() {
-        alphaValue = 1.0
+    private func updateStatus(_ text: String) {
+        currentSummary = text
+        if let button = statusItem.button {
+            button.toolTip = text
+        }
+        if let menu = statusItem.menu, menu.items.count > 0 {
+            menu.items[0].title = text
+        }
     }
 
-    func hideAnimated() {
-        alphaValue = 0.0
-    }
-
-    private func connectSSE() {
+    @MainActor private func connectSSE() {
         sseClient.connect(url: "http://127.0.0.1:9876/events") { [weak self] jsonStr in
             guard let self else { return }
             if let data = jsonStr.data(using: .utf8),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 let signal = json["signal"] as? String ?? "idle"
                 let summary = json["summary"] as? String ?? ""
+                let attention = json["attention"] as? String ?? ""
+                let state = signalToState(signal)
+                let statusText = attention.isEmpty ? summary : "\(summary) · \(attention)"
                 DispatchQueue.main.async {
-                    self.trafficLight.state = signalToState(signal)
-                    self.statusField.stringValue = summary
+                    self.lightView?.state = state
+                    self.updateStatus(statusText)
                 }
             }
         }
-    }
-
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-}
-
-// MARK: - App Delegate
-
-class AppDelegate: NSObject, NSApplicationDelegate {
-    var panel: FloatingPanel!
-    var statusItem: NSStatusItem!
-    let backend = BackendManager()
-    let monitor = CFProcessMonitor()
-    var cfRunning = false
-
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        backend.start()
-
-        panel = FloatingPanel()
-
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Signal Light")
-            button.image?.size = NSSize(width: 16, height: 16)
-        }
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "显示信号灯", action: #selector(showPanel), keyEquivalent: "s"))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
-        statusItem.menu = menu
-
-        // Start monitoring cf process
-        monitor.onCFStart = { [weak self] in
-            guard let self else { return }
-            self.cfRunning = true
-            self.panel.trafficLight.state = .idle
-            self.panel.statusField.stringValue = "空闲"
-            self.panel.showAnimated()
-        }
-
-        monitor.onCFExit = { [weak self] in
-            guard let self else { return }
-            self.cfRunning = false
-            self.panel.trafficLight.state = .waiting
-            self.panel.statusField.stringValue = "等待 cf 启动…"
-            self.panel.hideAnimated()
-        }
-
-        monitor.start()
-
-        // Check initial state — if cf is already running, show panel
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            if self?.cfRunning == true {
-                self?.panel.showAnimated()
-            }
-        }
-    }
-
-    @MainActor @objc func showPanel() {
-        panel.showAnimated()
     }
 
     @MainActor @objc func quit() {
