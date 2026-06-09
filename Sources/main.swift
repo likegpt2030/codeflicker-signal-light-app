@@ -70,11 +70,10 @@ class CLIProcessMonitor {
     private var timer: Timer?
     private var wasCFRunning = false
     private var wasClaudeRunning = false
-    private var wasClaudeActive = false
+    private var lastClaudeState: StatusBarLightView.LightState = .idle
     var onCLIStart: (() -> Void)?
     var onCLIExit: (() -> Void)?
-    var onClaudeActive: (() -> Void)?
-    var onClaudeIdle: (() -> Void)?
+    var onClaudeStateChange: ((StatusBarLightView.LightState) -> Void)?
     private let cfPidPath: String
     private let claudeStatusPath: String
 
@@ -87,7 +86,6 @@ class CLIProcessMonitor {
     func start() {
         wasCFRunning = checkFileFreshness(cfPidPath, maxAge: 20)
         wasClaudeRunning = isClaudeProcessRunning()
-        wasClaudeActive = wasClaudeRunning && isClaudeActivelyWorking()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.checkProcesses()
         }
@@ -127,16 +125,9 @@ class CLIProcessMonitor {
         }
     }
 
-    // tt-status.json mtime fresh → statusLine is being called → Claude actively working
-    // tt-status.json mtime stale → statusLine stopped → Claude idle (waiting for input)
-    private func isClaudeActivelyWorking() -> Bool {
-        return checkFileFreshness(claudeStatusPath, maxAge: 8)
-    }
-
     private func checkProcesses() {
         let cfRunning = checkFileFreshness(cfPidPath, maxAge: 20)
         let claudeRunning = isClaudeProcessRunning()
-        let claudeActive = claudeRunning && isClaudeActivelyWorking()
         let anyRunning = cfRunning || claudeRunning
         let wasAnyRunning = wasCFRunning || wasClaudeRunning
 
@@ -146,15 +137,29 @@ class CLIProcessMonitor {
             onCLIExit?()
         }
 
-        if claudeRunning && claudeActive && !wasClaudeActive {
-            onClaudeActive?()
-        } else if claudeRunning && !claudeActive && wasClaudeActive {
-            onClaudeIdle?()
-        }
-
         wasCFRunning = cfRunning
         wasClaudeRunning = claudeRunning
-        wasClaudeActive = claudeActive
+
+        // Claude 3-phase: fresh → thinking (yellow), stale → blocked (red), very stale → idle (green)
+        if claudeRunning {
+            let statusActive = checkFileFreshness(claudeStatusPath, maxAge: 8)
+            let statusRecent = checkFileFreshness(claudeStatusPath, maxAge: 30)
+            let newState: StatusBarLightView.LightState
+            if statusActive {
+                newState = .thinking
+            } else if statusRecent {
+                newState = .blocked
+            } else {
+                newState = .idle
+            }
+            if newState != lastClaudeState {
+                lastClaudeState = newState
+                onClaudeStateChange?(newState)
+            }
+        } else if lastClaudeState != .idle {
+            lastClaudeState = .idle
+            onClaudeStateChange?(.idle)
+        }
     }
 }
 
@@ -312,6 +317,21 @@ func signalToState(_ signal: String) -> StatusBarLightView.LightState {
     }
 }
 
+func statePriority(_ state: StatusBarLightView.LightState) -> Int {
+    switch state {
+    case .blocked: return 5
+    case .permission: return 4
+    case .attention: return 3
+    case .thinking, .working, .tool_done: return 2
+    case .done: return 1
+    case .idle, .session_start, .session_end, .waiting: return 0
+    }
+}
+
+func higherPriorityState(_ a: StatusBarLightView.LightState, _ b: StatusBarLightView.LightState) -> StatusBarLightView.LightState {
+    return statePriority(a) >= statePriority(b) ? a : b
+}
+
 // MARK: - Backend Process Manager
 
 class BackendManager {
@@ -366,9 +386,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let backend = BackendManager()
     let monitor = CLIProcessMonitor()
     var cliRunning = false
-    var currentSummary = "等待 cf 启动…"
+    var currentSummary = "等待启动…"
     let sseClient = SSEClient()
-    var lastSSETime: Date = .distantPast
+    var cfLightState: StatusBarLightView.LightState = .idle
+    var claudeLightState: StatusBarLightView.LightState? = nil
+    var cfSummary: String = ""
+    var claudeSummary: String = ""
     let idleIcon: NSImage = {
         let img = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Signal Light")!
         img.size = NSSize(width: 14, height: 14)
@@ -399,34 +422,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.onCLIStart = { [weak self] in
             guard let self else { return }
             self.cliRunning = true
+            // If claude is running, initialize its state
+            if self.claudeLightState == nil {
+                self.claudeLightState = .idle
+                self.claudeSummary = "Claude 空闲"
+            }
             self.showTrafficLight()
         }
 
         monitor.onCLIExit = { [weak self] in
             guard let self else { return }
             self.cliRunning = false
+            self.claudeLightState = nil
+            self.cfLightState = .idle
+            self.cfSummary = ""
+            self.claudeSummary = ""
             self.showIdleIcon()
         }
 
-        monitor.onClaudeActive = { [weak self] in
+        monitor.onClaudeStateChange = { [weak self] state in
             guard let self else { return }
-            if Date().timeIntervalSince(self.lastSSETime) > 2.0 {
-                self.lightView?.state = .thinking
-                self.updateStatus("Claude 正在思考…")
+            self.claudeLightState = state
+            switch state {
+            case .thinking: self.claudeSummary = "Claude 思考中"
+            case .blocked: self.claudeSummary = "Claude 等待处理"
+            default: self.claudeSummary = "Claude 空闲"
             }
-        }
-
-        monitor.onClaudeIdle = { [weak self] in
-            guard let self else { return }
-            if Date().timeIntervalSince(self.lastSSETime) > 2.0 {
-                self.lightView?.state = .idle
-                self.updateStatus("Claude 空闲")
-            }
+            self.mergeAndApplyLight()
         }
 
         monitor.start()
 
         if monitor.isRunning() {
+            cliRunning = true
+            // If claude is running, init its state so mergeAndApplyLight can use it
+            if claudeLightState == nil {
+                claudeLightState = .idle
+                claudeSummary = "Claude 空闲"
+            }
             showTrafficLight()
         }
 
@@ -466,7 +499,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             lightView?.isHidden = true
             button.image = idleIcon
         }
-        updateStatus("等待 cf 启动…")
+        updateStatus("等待启动…")
+    }
+
+    private func mergeAndApplyLight() {
+        guard cliRunning else { return }
+
+        let merged: StatusBarLightView.LightState
+        let mergedSummary: String
+
+        if let claudeState = claudeLightState {
+            // Both CLIs: show higher priority state
+            if statePriority(claudeState) > statePriority(cfLightState) {
+                merged = claudeState
+                mergedSummary = claudeSummary
+            } else if statePriority(cfLightState) > statePriority(claudeState) {
+                merged = cfLightState
+                mergedSummary = cfSummary.isEmpty ? "空闲" : cfSummary
+            } else {
+                // Same priority: combine
+                merged = cfLightState
+                var parts: [String] = []
+                if !cfSummary.isEmpty { parts.append("cf: \(cfSummary)") }
+                if !claudeSummary.isEmpty { parts.append(claudeSummary) }
+                mergedSummary = parts.isEmpty ? "空闲" : parts.joined(separator: " | ")
+            }
+        } else {
+            merged = cfLightState
+            mergedSummary = cfSummary.isEmpty ? "空闲" : cfSummary
+        }
+
+        lightView?.state = merged
+        updateStatus(mergedSummary)
     }
 
     private func updateStatus(_ text: String) {
@@ -490,9 +554,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let state = signalToState(signal)
                 let statusText = attention.isEmpty ? summary : "\(summary) · \(attention)"
                 DispatchQueue.main.async {
-                    self.lastSSETime = Date()
-                    self.lightView?.state = state
-                    self.updateStatus(statusText)
+                    self.cfLightState = state
+                    self.cfSummary = statusText
+                    self.mergeAndApplyLight()
                 }
             }
         }
