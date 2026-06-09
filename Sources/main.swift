@@ -70,18 +70,24 @@ class CLIProcessMonitor {
     private var timer: Timer?
     private var wasCFRunning = false
     private var wasClaudeRunning = false
+    private var wasClaudeActive = false
     var onCLIStart: (() -> Void)?
     var onCLIExit: (() -> Void)?
+    var onClaudeActive: (() -> Void)?
+    var onClaudeIdle: (() -> Void)?
     private let cfPidPath: String
+    private let claudeStatusPath: String
 
     init() {
         let home = NSHomeDirectory() as NSString
         cfPidPath = home.appendingPathComponent(".codeflicker/signal-light-sim/.cf-active")
+        claudeStatusPath = home.appendingPathComponent(".claude/tt-status.json")
     }
 
     func start() {
         wasCFRunning = checkFileFreshness(cfPidPath, maxAge: 20)
         wasClaudeRunning = isClaudeProcessRunning()
+        wasClaudeActive = wasClaudeRunning && isClaudeActivelyWorking()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.checkProcesses()
         }
@@ -121,9 +127,16 @@ class CLIProcessMonitor {
         }
     }
 
+    // tt-status.json mtime fresh → statusLine is being called → Claude actively working
+    // tt-status.json mtime stale → statusLine stopped → Claude idle (waiting for input)
+    private func isClaudeActivelyWorking() -> Bool {
+        return checkFileFreshness(claudeStatusPath, maxAge: 8)
+    }
+
     private func checkProcesses() {
         let cfRunning = checkFileFreshness(cfPidPath, maxAge: 20)
         let claudeRunning = isClaudeProcessRunning()
+        let claudeActive = claudeRunning && isClaudeActivelyWorking()
         let anyRunning = cfRunning || claudeRunning
         let wasAnyRunning = wasCFRunning || wasClaudeRunning
 
@@ -133,8 +146,15 @@ class CLIProcessMonitor {
             onCLIExit?()
         }
 
+        if claudeRunning && claudeActive && !wasClaudeActive {
+            onClaudeActive?()
+        } else if claudeRunning && !claudeActive && wasClaudeActive {
+            onClaudeIdle?()
+        }
+
         wasCFRunning = cfRunning
         wasClaudeRunning = claudeRunning
+        wasClaudeActive = claudeActive
     }
 }
 
@@ -348,6 +368,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var cliRunning = false
     var currentSummary = "等待 cf 启动…"
     let sseClient = SSEClient()
+    var lastSSETime: Date = .distantPast
     let idleIcon: NSImage = {
         let img = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Signal Light")!
         img.size = NSSize(width: 14, height: 14)
@@ -385,6 +406,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.cliRunning = false
             self.showIdleIcon()
+        }
+
+        monitor.onClaudeActive = { [weak self] in
+            guard let self else { return }
+            if Date().timeIntervalSince(self.lastSSETime) > 2.0 {
+                self.lightView?.state = .thinking
+                self.updateStatus("Claude 正在思考…")
+            }
+        }
+
+        monitor.onClaudeIdle = { [weak self] in
+            guard let self else { return }
+            if Date().timeIntervalSince(self.lastSSETime) > 2.0 {
+                self.lightView?.state = .idle
+                self.updateStatus("Claude 空闲")
+            }
         }
 
         monitor.start()
@@ -453,6 +490,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let state = signalToState(signal)
                 let statusText = attention.isEmpty ? summary : "\(summary) · \(attention)"
                 DispatchQueue.main.async {
+                    self.lastSSETime = Date()
                     self.lightView?.state = state
                     self.updateStatus(statusText)
                 }
