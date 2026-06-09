@@ -64,38 +64,36 @@ class SSEClient: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     }
 }
 
-// MARK: - CF Process Monitor
+// MARK: - CLI Process Monitor (cf + claude)
 
-class CFProcessMonitor {
+class CLIProcessMonitor {
     private var timer: Timer?
-    private var wasRunning = false
-    var onCFStart: (() -> Void)?
-    var onCFExit: (() -> Void)?
-    private let pidFilePath: String
+    private var wasCFRunning = false
+    private var wasClaudeRunning = false
+    var onCLIStart: (() -> Void)?
+    var onCLIExit: (() -> Void)?
+    private let cfPidPath: String
+    private let claudePidPath: String
+    private let claudeStatusPath: String
 
     init() {
-        pidFilePath = (NSHomeDirectory() as NSString).appendingPathComponent(".codeflicker/signal-light-sim/.cf-active")
+        let home = NSHomeDirectory() as NSString
+        cfPidPath = home.appendingPathComponent(".codeflicker/signal-light-sim/.cf-active")
+        claudePidPath = home.appendingPathComponent(".codeflicker/signal-light-sim/.claude-active")
+        claudeStatusPath = home.appendingPathComponent(".claude/tt-status.json")
     }
 
     func start() {
-        // Check if cf is already running at startup
-        wasRunning = checkPIDFile()
+        wasCFRunning = checkFileFreshness(cfPidPath, maxAge: 20)
+        wasClaudeRunning = checkClaudeRunning()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.checkCFProcess()
+            self?.checkProcesses()
         }
         timer?.tolerance = 0.3
     }
 
     func isRunning() -> Bool {
-        return wasRunning
-    }
-
-    private func checkPIDFile() -> Bool {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: pidFilePath),
-              let mtime = attrs[.modificationDate] as? Date else {
-            return false
-        }
-        return Date().timeIntervalSince(mtime) < 20
+        return wasCFRunning || wasClaudeRunning
     }
 
     func stop() {
@@ -103,15 +101,40 @@ class CFProcessMonitor {
         timer = nil
     }
 
-    private func checkCFProcess() {
-        let isRunning = checkPIDFile()
-
-        if isRunning && !wasRunning {
-            onCFStart?()
-        } else if !isRunning && wasRunning {
-            onCFExit?()
+    private func checkFileFreshness(_ path: String, maxAge: TimeInterval) -> Bool {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let mtime = attrs[.modificationDate] as? Date else {
+            return false
         }
-        wasRunning = isRunning
+        return Date().timeIntervalSince(mtime) < maxAge
+    }
+
+    private func checkClaudeRunning() -> Bool {
+        // Primary: hook-written PID file
+        if checkFileFreshness(claudePidPath, maxAge: 20) {
+            return true
+        }
+        // Fallback: tt-status.json freshness (statusLine updates frequently while running)
+        if checkFileFreshness(claudeStatusPath, maxAge: 30) {
+            return true
+        }
+        return false
+    }
+
+    private func checkProcesses() {
+        let cfRunning = checkFileFreshness(cfPidPath, maxAge: 20)
+        let claudeRunning = checkClaudeRunning()
+        let anyRunning = cfRunning || claudeRunning
+        let wasAnyRunning = wasCFRunning || wasClaudeRunning
+
+        if anyRunning && !wasAnyRunning {
+            onCLIStart?()
+        } else if !anyRunning && wasAnyRunning {
+            onCLIExit?()
+        }
+
+        wasCFRunning = cfRunning
+        wasClaudeRunning = claudeRunning
     }
 }
 
@@ -321,8 +344,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var lightView: StatusBarLightView!
     let backend = BackendManager()
-    let monitor = CFProcessMonitor()
-    var cfRunning = false
+    let monitor = CLIProcessMonitor()
+    var cliRunning = false
     var currentSummary = "等待 cf 启动…"
     let sseClient = SSEClient()
     let idleIcon: NSImage = {
@@ -351,28 +374,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // SSE
         connectSSE()
 
-        // CF process monitoring
-        monitor.onCFStart = { [weak self] in
+        // CLI process monitoring (cf + claude)
+        monitor.onCLIStart = { [weak self] in
             guard let self else { return }
-            self.cfRunning = true
+            self.cliRunning = true
             self.showTrafficLight()
         }
 
-        monitor.onCFExit = { [weak self] in
+        monitor.onCLIExit = { [weak self] in
             guard let self else { return }
-            self.cfRunning = false
+            self.cliRunning = false
             self.showIdleIcon()
         }
 
         monitor.start()
 
-        // Show traffic light if cf is already running at startup
         if monitor.isRunning() {
             showTrafficLight()
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            if self?.cfRunning == true {
+            if self?.cliRunning == true {
                 self?.showTrafficLight()
             }
         }
