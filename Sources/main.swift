@@ -73,19 +73,15 @@ class CLIProcessMonitor {
     var onCLIStart: (() -> Void)?
     var onCLIExit: (() -> Void)?
     private let cfPidPath: String
-    private let claudePidPath: String
-    private let claudeStatusPath: String
 
     init() {
         let home = NSHomeDirectory() as NSString
         cfPidPath = home.appendingPathComponent(".codeflicker/signal-light-sim/.cf-active")
-        claudePidPath = home.appendingPathComponent(".codeflicker/signal-light-sim/.claude-active")
-        claudeStatusPath = home.appendingPathComponent(".claude/tt-status.json")
     }
 
     func start() {
         wasCFRunning = checkFileFreshness(cfPidPath, maxAge: 20)
-        wasClaudeRunning = checkClaudeRunning()
+        wasClaudeRunning = isClaudeProcessRunning()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.checkProcesses()
         }
@@ -109,21 +105,25 @@ class CLIProcessMonitor {
         return Date().timeIntervalSince(mtime) < maxAge
     }
 
-    private func checkClaudeRunning() -> Bool {
-        // Primary: hook-written PID file
-        if checkFileFreshness(claudePidPath, maxAge: 20) {
-            return true
+    private func isClaudeProcessRunning() -> Bool {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        task.arguments = ["-x", "claude"]
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+            task.waitUntilExit()
+            return task.terminationStatus == 0
+        } catch {
+            return false
         }
-        // Fallback: tt-status.json freshness (statusLine updates frequently while running)
-        if checkFileFreshness(claudeStatusPath, maxAge: 30) {
-            return true
-        }
-        return false
     }
 
     private func checkProcesses() {
         let cfRunning = checkFileFreshness(cfPidPath, maxAge: 20)
-        let claudeRunning = checkClaudeRunning()
+        let claudeRunning = isClaudeProcessRunning()
         let anyRunning = cfRunning || claudeRunning
         let wasAnyRunning = wasCFRunning || wasClaudeRunning
 
