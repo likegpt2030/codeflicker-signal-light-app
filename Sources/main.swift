@@ -75,12 +75,12 @@ class CLIProcessMonitor {
     var onCLIExit: (() -> Void)?
     var onClaudeStateChange: ((StatusBarLightView.LightState) -> Void)?
     private let cfPidPath: String
-    private let claudeStatusPath: String
+    private let claudeProjectsPath: String
 
     init() {
         let home = NSHomeDirectory() as NSString
         cfPidPath = home.appendingPathComponent(".codeflicker/signal-light-sim/.cf-active")
-        claudeStatusPath = home.appendingPathComponent(".claude/tt-status.json")
+        claudeProjectsPath = home.appendingPathComponent(".claude/projects")
     }
 
     func start() {
@@ -125,6 +125,30 @@ class CLIProcessMonitor {
         }
     }
 
+    // Scan ~/.claude/projects/ for latest .jsonl mtime
+    private func latestTranscriptAge() -> TimeInterval {
+        let fm = FileManager.default
+        guard let projectDirs = try? fm.contentsOfDirectory(atPath: claudeProjectsPath) else {
+            return 99999
+        }
+        var latestMtime: Date = .distantPast
+        for dir in projectDirs {
+            let dirPath = (claudeProjectsPath as NSString).appendingPathComponent(dir)
+            guard let files = try? fm.contentsOfDirectory(atPath: dirPath) else { continue }
+            for file in files {
+                if file.hasSuffix(".jsonl") {
+                    let filePath = (dirPath as NSString).appendingPathComponent(file)
+                    if let attrs = try? fm.attributesOfItem(atPath: filePath),
+                       let mtime = attrs[.modificationDate] as? Date,
+                       mtime > latestMtime {
+                        latestMtime = mtime
+                    }
+                }
+            }
+        }
+        return Date().timeIntervalSince(latestMtime)
+    }
+
     private func checkProcesses() {
         let cfRunning = checkFileFreshness(cfPidPath, maxAge: 20)
         let claudeRunning = isClaudeProcessRunning()
@@ -140,14 +164,14 @@ class CLIProcessMonitor {
         wasCFRunning = cfRunning
         wasClaudeRunning = claudeRunning
 
-        // Claude 3-phase: fresh → thinking (yellow), stale → blocked (red), very stale → idle (green)
+        // Claude 3-phase via transcript .jsonl freshness:
+        // fresh (<3s) → thinking (yellow), stale (<10s) → blocked (red), very stale → idle (green)
         if claudeRunning {
-            let statusActive = checkFileFreshness(claudeStatusPath, maxAge: 8)
-            let statusRecent = checkFileFreshness(claudeStatusPath, maxAge: 30)
+            let transcriptAge = latestTranscriptAge()
             let newState: StatusBarLightView.LightState
-            if statusActive {
+            if transcriptAge < 3 {
                 newState = .thinking
-            } else if statusRecent {
+            } else if transcriptAge < 10 {
                 newState = .blocked
             } else {
                 newState = .idle
