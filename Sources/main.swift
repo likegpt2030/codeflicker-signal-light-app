@@ -74,18 +74,16 @@ class CLIProcessMonitor {
     var onCLIStart: (() -> Void)?
     var onCLIExit: (() -> Void)?
     var onClaudeStateChange: ((StatusBarLightView.LightState) -> Void)?
-    private let cfPidPath: String
     private let claudeProjectsPath: String
 
     init() {
         let home = NSHomeDirectory() as NSString
-        cfPidPath = home.appendingPathComponent(".codeflicker/signal-light-sim/.cf-active")
         claudeProjectsPath = home.appendingPathComponent(".claude/projects")
     }
 
     func start() {
-        wasCFRunning = checkFileFreshness(cfPidPath, maxAge: 20)
-        wasClaudeRunning = isClaudeProcessRunning()
+        wasCFRunning = isProcessRunning("cf")
+        wasClaudeRunning = isProcessRunning("claude")
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.checkProcesses()
         }
@@ -101,18 +99,10 @@ class CLIProcessMonitor {
         timer = nil
     }
 
-    private func checkFileFreshness(_ path: String, maxAge: TimeInterval) -> Bool {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
-              let mtime = attrs[.modificationDate] as? Date else {
-            return false
-        }
-        return Date().timeIntervalSince(mtime) < maxAge
-    }
-
-    private func isClaudeProcessRunning() -> Bool {
+    private func isProcessRunning(_ name: String) -> Bool {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-x", "claude"]
+        task.arguments = ["-x", name]
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
@@ -150,8 +140,8 @@ class CLIProcessMonitor {
     }
 
     private func checkProcesses() {
-        let cfRunning = checkFileFreshness(cfPidPath, maxAge: 20)
-        let claudeRunning = isClaudeProcessRunning()
+        let cfRunning = isProcessRunning("cf")
+        let claudeRunning = isProcessRunning("claude")
         let anyRunning = cfRunning || claudeRunning
         let wasAnyRunning = wasCFRunning || wasClaudeRunning
 
